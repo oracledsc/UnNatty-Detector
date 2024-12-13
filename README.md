@@ -54,8 +54,9 @@ You can directly download the precompiled binary from the [Releases Page](https:
 
 ### Usage
 1. **Send the Tool**: Share the `UnNatty-Detector.exe` file with the target user.
-2. **Run on Screenshare**: Instruct the user to run the tool while screensharing.
-3. **Analyze Results**:
+2. **Make sure he doesn't restart Discord or leave the VC!**
+3. **Run on Screenshare**: Instruct the user to run the tool while screensharing.
+4. **Analyze Results**:
    - If a hook is detected, the tool will alert: `Hook detected! Analyze logs.txt for more information.`
    - If no hook is detected, the tool will say so but advise checking the `logs.txt` file manually.
    - The `logs.txt` file includes:
