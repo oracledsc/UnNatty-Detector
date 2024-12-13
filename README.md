@@ -46,7 +46,7 @@ If you don’t trust the provided executable, you can build the tool from source
    git clone https://github.com/oracledsc/UnNatty-Detector.git
    cd UnNatty-Detector
    ```
-3. Open the project in Visual Studio 2022 and build the solution.
+3. Open the project in Visual Studio 2022 and build the solution in Release x64
 4. For assistance, DM `oracledsc` on Discord.
 
 ### Download Precompiled Binary
