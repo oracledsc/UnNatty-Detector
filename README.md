@@ -61,6 +61,7 @@ You can directly download the precompiled binary from the [Releases Page](https:
    - The `logs.txt` file includes:
      - Process list: Helps identify suspicious processes like Abaddon or hooks.
      - Voice node details: Includes file size, offsets, etc., to verify against the latest Discord voice node.
+     - More Infos if a hook has been detected.
 
 ### What to Do If Someone Bypasses It
 If someone bypasses the tool or it fails to detect a hook:
