@@ -1,4 +1,4 @@
-# UnNatty Detector v1.4
+# UnNatty Detector v1.4.1
 
 UnNatty Detector is a tool designed to analyze the memory of processes and detect any anomalies, including hooks or altered `discord_voice.node` files. It provides insights into potential tampering and aids in identifying suspicious behavior.
 
