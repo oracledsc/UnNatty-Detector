@@ -7,14 +7,12 @@
 #include <sstream>
 #include <Psapi.h>
 #include <TlHelp32.h>
-#include "xorstr.hpp"
 
-// VM_START
 const wchar_t* boxChars[] = {
-    xorstr_(L"-------------------------------------------------------"),
-    xorstr_(L"                    HOOK DETECTED                       "),
-    xorstr_(L"               NO FALSE DETECTIONS HERE                 "),
-    xorstr_(L"-------------------------------------------------------")
+    L"-------------------------------------------------------",
+    L"                    HOOK DETECTED                       ",
+    L"               NO FALSE DETECTIONS HERE                 ",
+    L"-------------------------------------------------------"
 };
 
 void NegroAscendIsChinese(const std::string& message, const char* color = "", int delayMs = 100) {
@@ -25,24 +23,25 @@ void NegroAscendIsChinese(const std::string& message, const char* color = "", in
 void HookDetector::writeHookDetails(const std::string& logFilePath, const HookDetectionResult& result, bool isHook) {
     std::ofstream outFile(logFilePath, std::ios::app);
     if (!outFile.is_open()) {
-        std::cerr << xorstr_("Failed to open logs.txt for writing hook details.") << std::endl;
+        std::cerr << "Failed to open logs.txt for writing hook details." << std::endl;
         return;
     }
 
+    // Write detection details
     outFile << "\n" << std::string(80, '=') << "\n";
-    outFile << (isHook ? xorstr_("                    HOOK DETECTION ALERT\n") : xorstr_("                    MEMORY PATCH DETECTED\n"));
+    outFile << (isHook ? "                    HOOK DETECTION ALERT\n" : "                    MEMORY PATCH DETECTED\n");
     outFile << std::string(80, '=') << "\n\n";
 
-    outFile << xorstr_("Details:\n");
-    outFile << xorstr_("-------------\n");
-    outFile << xorstr_("Section Name: ") << result.sectionName << "\n";
-    outFile << xorstr_("Offset: 0x") << std::hex << result.offset << std::dec << "\n";
-    outFile << (isHook ? xorstr_("Hook Type: ") : xorstr_("Patch Type: ")) << result.hookType << "\n";
-    outFile << xorstr_("Original Bytes: ") << bytesToHexString(result.originalBytes) << "\n";
-    outFile << xorstr_("Modified Bytes: ") << bytesToHexString(result.modifiedBytes) << "\n\n";
+    outFile << "Details:\n";
+    outFile << "-------------\n";
+    outFile << "Section Name: " << result.sectionName << "\n";
+    outFile << "Offset: 0x" << std::hex << result.offset << std::dec << "\n";
+    outFile << (isHook ? "Hook Type: " : "Patch Type: ") << result.hookType << "\n";
+    outFile << "Original Bytes: " << bytesToHexString(result.originalBytes) << "\n";
+    outFile << "Modified Bytes: " << bytesToHexString(result.modifiedBytes) << "\n\n";
 
-    outFile << xorstr_("Integrity Status: ") << (isHook ? xorstr_("VIOLATED") : xorstr_("PATCHED")) << "\n";
-    outFile << xorstr_("Hook Confidence: 100% POSITIVE\n");
+    outFile << "Integrity Status: " << (isHook ? "VIOLATED" : "PATCHED") << "\n";
+    outFile << "Hook Confidence: 100% POSITIVE\n";
     outFile << std::string(80, '=') << "\n\n";
 }
 
@@ -50,19 +49,19 @@ HookDetector::HookDetector() {
     SetConsoleOutputCP(CP_UTF8);
 
     HOOK_PATTERNS = {
-        {{0xFF, 0x25}, xorstr_("JMP FAR")}, // thx ascend for giving me access to one of his hooks x)
-        {{0xFF, 0x15}, xorstr_("CALL FAR")},
-        {{0xE9}, xorstr_("JMP NEAR")},
-        {{0xE8}, xorstr_("CALL NEAR")},
-        {{0xFF, 0x35}, xorstr_("PUSH")},
-        {{0x68}, xorstr_("PUSH IMM")},
-        {{0xFF, 0x24}, xorstr_("JMP INDIRECT")},
-        {{0xFF, 0x14}, xorstr_("CALL INDIRECT")},
-        {{0x90}, xorstr_("NOP")},
-        {{0xCC}, xorstr_("INT3")},
-        {{0xCD, 0x03}, xorstr_("INT 3")},
-        {{0xF3, 0x90}, xorstr_("PAUSE")},
-        {{0xFF, 0xFF}, xorstr_("Invalid Opcode")}
+        {{0xFF, 0x25}, "JMP FAR"},
+        {{0xFF, 0x15}, "CALL FAR"},
+        {{0xE9}, "JMP NEAR"},
+        {{0xE8}, "CALL NEAR"},
+        {{0xFF, 0x35}, "PUSH"},
+        {{0x68}, "PUSH IMM"},
+        {{0xFF, 0x24}, "JMP INDIRECT"},
+        {{0xFF, 0x14}, "CALL INDIRECT"},
+        {{0x90}, "NOP"},
+        {{0xCC}, "INT3"},
+        {{0xCD, 0x03}, "INT 3"},
+        {{0xF3, 0x90}, "PAUSE"},
+        {{0xFF, 0xFF}, "Invalid Opcode"}
     };
 }
 
@@ -149,7 +148,7 @@ HookDetectionResult HookDetector::analyzeModule(const ProcessInfo& processInfo) 
                                     );
                                 }
 
-                                writeHookDetails(xorstr_("logs.txt"), result, true);
+                                writeHookDetails("logs.txt", result, true);
 
                                 if (!hookDetectedPrinted) {
                                     HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -172,12 +171,12 @@ HookDetectionResult HookDetector::analyzeModule(const ProcessInfo& processInfo) 
                         if (!std::equal(fileData.begin() + fileOffset, fileData.begin() + fileOffset + 10, memoryData.begin() + offset)) {
                             result.sectionName = std::string((char*)sectionHeader.Name, 8);
                             result.offset = sectionHeader.VirtualAddress + offset;
-                            result.hookType = xorstr_("Memory Patch");
+                            result.hookType = "Memory Patch";
 
                             result.originalBytes.assign(fileData.begin() + fileOffset, fileData.begin() + fileOffset + 10);
                             result.modifiedBytes.assign(memoryData.begin() + offset, memoryData.begin() + offset + 10);
 
-                            writeHookDetails(xorstr_("logs.txt"), result, false);
+                            writeHookDetails("logs.txt", result, false);
                         }
                     }
                 }
@@ -188,12 +187,10 @@ HookDetectionResult HookDetector::analyzeModule(const ProcessInfo& processInfo) 
     CloseHandle(processHandle);
 
     if (!result.foundHooks) {
-        const wchar_t* noHooksMsg = xorstr_(L"[+] No hooks detected in ");
-        const wchar_t* newline = xorstr_(L" \n\n");
-        std::wcout << GREEN << noHooksMsg << processInfo.version.c_str() << newline << RESET;
+        std::wcout << GREEN << L"[+] No hooks detected in " << processInfo.version.c_str()
+            << L" \n\n" << RESET;
         std::cout << std::string(80, '=') << std::endl;
     }
 
     return result;
 }
-// VM_END
