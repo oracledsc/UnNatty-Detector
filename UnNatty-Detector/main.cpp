@@ -97,12 +97,11 @@ int main() {
             return 1;
         }
 
-        // Log file header
         log << "=======================================================\n";
         log << "                Discord Information                     \n";
         log << "=======================================================\n\n";
 
-        logConsoleOnly("\n[*] Analyzing discord_voice.node...\n", BLUE);
+        logConsoleOnly("\n[*] Checking discord_voice.node...\n", BLUE);
         auto voiceNodes = getVoiceNodeInfo();
 
         for (const auto& process : processes) {
@@ -135,7 +134,6 @@ int main() {
             auto result = hookDetector.analyzeModule(process);
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
-        logConsoleOnly("\n================================================================================\n", WHITE);
         logConsoleOnly("\n[*] Results saved to logs.txt\n", BLUE);
         logConsoleOnly("[*] Press Enter to exit...", BLUE);
         std::cin.get();
