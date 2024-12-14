@@ -1,4 +1,4 @@
-﻿#include "common.h"
+#include "common.h"
 #include "hookdetector.h"
 #include "processchecker.h"
 #include <filesystem>
@@ -7,19 +7,17 @@
 #include <sstream>
 #include <Psapi.h>
 #include <TlHelp32.h>
-#include "xorstr.hpp"
 #define WHITE "\033[37m"
-// VM_START
+
 
 namespace fs = std::filesystem;
 
 void printBanner() {
-    const char* banner = xorstr_(R"(
+    std::cout << BLUE << R"(
 =======================================================
-              UnNatty-Detector v1.4                   
+              UnNatty-Detector v1.4.1                   
                 Created by Oracle                       
-=======================================================)");
-    std::cout << BLUE << banner << RESET << std::endl;
+=======================================================)" << RESET << std::endl;
 }
 
 void logConsoleOnly(const std::string& message, const char* color = "", int delayMs = 100) {
@@ -62,22 +60,17 @@ std::vector<std::tuple<std::string, DWORD, size_t>> getVoiceNodeInfo() {
     PROCESSENTRY32W processEntry;
     processEntry.dwSize = sizeof(processEntry);
 
-    const wchar_t* discord_exe = xorstr_(L"Discord.exe");
-    const wchar_t* discord_ptb = xorstr_(L"DiscordPTB.exe");
-    const wchar_t* discord_canary = xorstr_(L"DiscordCanary.exe");
-    const char* discord_node = xorstr_("discord_voice.node");
-
     if (Process32FirstW(snapshot, &processEntry)) {
         do {
             std::wstring processName = processEntry.szExeFile;
             std::string type;
 
-            if (wcscmp(processName.c_str(), discord_exe) == 0) type = "Discord";
-            else if (wcscmp(processName.c_str(), discord_ptb) == 0) type = "Discord PTB";
-            else if (wcscmp(processName.c_str(), discord_canary) == 0) type = "Discord Canary";
+            if (processName == L"Discord.exe") type = "Discord";
+            else if (processName == L"DiscordPTB.exe") type = "Discord PTB";
+            else if (processName == L"DiscordCanary.exe") type = "Discord Canary";
             else continue;
 
-            size_t moduleSize = getModuleMemorySize(processEntry.th32ProcessID, discord_node);
+            size_t moduleSize = getModuleMemorySize(processEntry.th32ProcessID, "discord_voice.node");
             if (moduleSize > 0) {
                 nodeInfo.push_back({ type, processEntry.th32ProcessID, moduleSize });
             }
@@ -93,89 +86,64 @@ int main() {
     std::ofstream log("logs.txt");
 
     try {
+
         printBanner();
         ProcessChecker processChecker;
         HookDetector hookDetector;
 
         auto processes = processChecker.findDiscordProcesses();
         if (processes.empty()) {
-            const char* noDiscordMsg = xorstr_("\n[!] No Discord installations found\n");
-            logConsoleOnly(noDiscordMsg, RED);
+            logConsoleOnly("\n[!] No Discord installations found\n", RED);
             return 1;
         }
 
-        const char* header1 = xorstr_("=======================================================\n");
-        const char* header2 = xorstr_("                Discord Information                     \n");
-        log << header1;
-        log << header2;
-        log << header1 << "\n";
+        // Log file header
+        log << "=======================================================\n";
+        log << "                Discord Information                     \n";
+        log << "=======================================================\n\n";
 
-        const char* analyzingMsg = xorstr_("\n[*] Analyzing discord_voice.node...\n");
-        logConsoleOnly(analyzingMsg, BLUE);
+        logConsoleOnly("\n[*] Analyzing discord_voice.node...\n", BLUE);
         auto voiceNodes = getVoiceNodeInfo();
 
-        const char* version_str = xorstr_("Discord Version: ");
-        const char* pid_str = xorstr_("Process ID: ");
-        const char* addr_str = xorstr_("Base Address: 0x");
-        const char* size_str = xorstr_("Voice Node Size: ");
-        const char* bytes_str = xorstr_(" bytes\n");
-        const char* separator = xorstr_("-------------------------------------------------------\n\n");
-
         for (const auto& process : processes) {
-            log << version_str << process.version << "\n";
-            log << pid_str << process.pid << "\n";
-            log << addr_str << std::hex << process.baseAddress << std::dec << "\n";
+            log << "Discord Version: " << process.version << "\n";
+            log << "Process ID: " << process.pid << "\n";
+            log << "Base Address: 0x" << std::hex << process.baseAddress << std::dec << "\n";
 
             for (const auto& [type, pid, size] : voiceNodes) {
                 if (type == process.version) {
-                    log << size_str << size << bytes_str;
+                    log << "Voice Node Size: " << size << " bytes\n";
                     break;
                 }
             }
-            log << separator;
+            log << "-------------------------------------------------------\n\n";
 
-            std::string foundMsg = "[+] Found " + process.version + "\n";
-            logConsoleOnly(foundMsg, GREEN);
+            logConsoleOnly("[+] Found " + process.version + "\n", GREEN);
         }
 
-        const char* historyMsg = xorstr_("\n[*] Logging process history...\n");
-        logConsoleOnly(historyMsg, BLUE);
+        logConsoleOnly("\n[*] Logging process history...\n", BLUE);
         processChecker.logProcessHistory();
 
-        const char* hookHeader = xorstr_("                    Hook Analysis                       \n");
-        log << header1;
-        log << hookHeader;
-        log << header1 << "\n";
+        log << "=======================================================\n";
+        log << "                    Hook Analysis                       \n";
+        log << "=======================================================\n\n";
 
-        const char* analyzingHooksMsg = xorstr_("\n[*] Analyzing for hooks...\n\n");
-        const char* separator2 = xorstr_("================================================================================\n");
-
-        logConsoleOnly(analyzingHooksMsg, BLUE);
-        logConsoleOnly(separator2);
-
+        logConsoleOnly("\n[*] Analyzing for hooks...\n\n", BLUE);
+        logConsoleOnly("================================================================================\n");
         for (const auto& process : processes) {
-            std::string analyzeMsg = "\n[+] Analyzing " + process.version + "...\n\n";
-            logConsoleOnly(analyzeMsg, GREEN);
+            logConsoleOnly("\n[+] Analyzing " + process.version + "...\n\n", GREEN);
             auto result = hookDetector.analyzeModule(process);
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
-
-        logConsoleOnly(separator2, WHITE);
-
-        const char* savedMsg = xorstr_("\n[*] Results saved to logs.txt\n");
-        const char* exitMsg = xorstr_("[*] Press Enter to exit...");
-        logConsoleOnly(savedMsg, BLUE);
-        logConsoleOnly(exitMsg, BLUE);
+        logConsoleOnly("\n================================================================================\n", WHITE);
+        logConsoleOnly("\n[*] Results saved to logs.txt\n", BLUE);
+        logConsoleOnly("[*] Press Enter to exit...", BLUE);
         std::cin.get();
         return 0;
 
     }
     catch (const std::exception& e) {
-        std::string errorMsg = "\n[!] Error: ";
-        errorMsg += e.what();
-        errorMsg += "\n[!] Run as administrator\n";
-        logConsoleOnly(errorMsg, RED);
+        logConsoleOnly(std::string("\n[!] Error: ") + e.what() + "\n[!] Run as administrator\n", RED);
         return 1;
     }
 }
-// VM_END
