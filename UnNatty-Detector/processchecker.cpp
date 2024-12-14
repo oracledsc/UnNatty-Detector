@@ -1,15 +1,11 @@
-﻿#include "processchecker.h"
+#include "processchecker.h"
 #include "common.h"
-#include "xorstr.hpp"
 
 void ProcessChecker::logProcessHistory() {
-    const auto logFile = std::string(xorstr_("logs.txt"));
-    std::ofstream log(logFile, std::ios::app);
-
-    const auto header = std::string(xorstr_(R"(
+    std::ofstream log("logs.txt", std::ios::app);
+    log << R"(
 ---------------------- Process History ----------------------
-)"));
-    log << header;
+)";
 
     auto processes = getCurrentProcesses();
     auto historicalProcesses = getUserAssistKeys();
@@ -27,33 +23,23 @@ void ProcessChecker::logProcessHistory() {
         }
     }
 
-    const auto footer = std::string(xorstr_("-------------------------------------------------------\n\n"));
-    log << footer;
+    log << "-------------------------------------------------------\n\n";
 }
+
+
 
 std::vector<ProcessInfo> ProcessChecker::findDiscordProcesses() {
     std::vector<ProcessInfo> foundProcesses;
-
-    const auto discord_exe = std::string(xorstr_("discord.exe"));
-    const auto discord_name = std::string(xorstr_("Discord"));
-    const auto discordcanary_exe = std::string(xorstr_("discordcanary.exe"));
-    const auto discord_canary_name = std::string(xorstr_("Discord Canary"));
-    const auto discordptb_exe = std::string(xorstr_("discordptb.exe"));
-    const auto discord_ptb_name = std::string(xorstr_("Discord PTB"));
-
     std::map<std::string, std::string> discordVersions = {
-        {discord_exe, discord_name},
-        {discordcanary_exe, discord_canary_name},
-        {discordptb_exe, discord_ptb_name}
+        {"discord.exe", "Discord"},
+        {"discordcanary.exe", "Discord Canary"},
+        {"discordptb.exe", "Discord PTB"}
     };
 
-    const auto logFile = std::string(xorstr_("logs.txt"));
-    std::ofstream log(logFile, std::ios::app);
-
-    const auto header = std::string(xorstr_(R"(
+    std::ofstream log("logs.txt", std::ios::app);
+    log << R"(
 -------------------- Discord Analysis ----------------------
-)"));
-    log << header;
+)";
 
     HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (snapshot == INVALID_HANDLE_VALUE) return foundProcesses;
@@ -71,9 +57,7 @@ std::vector<ProcessInfo> ProcessChecker::findDiscordProcesses() {
             auto it = discordVersions.find(processName);
             if (it != discordVersions.end()) {
                 foundVersions.insert(processName);
-                const auto found_msg = std::string(xorstr_("[+] Found "));
-                const auto pid_msg = std::string(xorstr_(" (PID: "));
-                log << found_msg << it->second << pid_msg << pe32.th32ProcessID << ")\n";
+                log << "[+] Found " << it->second << " (PID: " << pe32.th32ProcessID << ")\n";
 
                 HANDLE processHandle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe32.th32ProcessID);
                 if (processHandle) {
@@ -84,9 +68,7 @@ std::vector<ProcessInfo> ProcessChecker::findDiscordProcesses() {
                             char modPath[MAX_PATH];
                             if (GetModuleFileNameExA(processHandle, modules[i], modPath, sizeof(modPath))) {
                                 std::string modulePath = modPath;
-                                const auto voice_node = std::string(xorstr_("discord_voice.node"));
-
-                                if (modulePath.find(voice_node) != std::string::npos) {
+                                if (modulePath.find("discord_voice.node") != std::string::npos) {
                                     ProcessInfo info;
                                     info.pid = pe32.th32ProcessID;
                                     info.baseAddress = (ULONGLONG)modules[i];
@@ -100,12 +82,8 @@ std::vector<ProcessInfo> ProcessChecker::findDiscordProcesses() {
                                         fileSize.LowPart = fileAttr.nFileSizeLow;
                                         fileSize.HighPart = fileAttr.nFileSizeHigh;
 
-                                        const auto size_msg = std::string(xorstr_("    Voice Node Size: "));
-                                        const auto bytes_msg = std::string(xorstr_(" bytes\n"));
-                                        const auto addr_msg = std::string(xorstr_("    Base Address: 0x"));
-
-                                        log << size_msg << fileSize.QuadPart << bytes_msg;
-                                        log << addr_msg << std::hex << info.baseAddress << std::dec << "\n";
+                                        log << "    Voice Node Size: " << fileSize.QuadPart << " bytes\n";
+                                        log << "    Base Address: 0x" << std::hex << info.baseAddress << std::dec << "\n";
                                     }
                                 }
                             }
@@ -121,16 +99,14 @@ std::vector<ProcessInfo> ProcessChecker::findDiscordProcesses() {
 
     for (const auto& version : discordVersions) {
         if (foundVersions.find(version.first) == foundVersions.end()) {
-            const auto not_detected_prefix = std::string(xorstr_("[!] "));
-            const auto not_detected_suffix = std::string(xorstr_(" not detected\n"));
-            log << not_detected_prefix << version.second << not_detected_suffix;
+            log << "[!] " << version.second << " not detected\n";
         }
     }
 
-    const auto footer = std::string(xorstr_("-------------------------------------------------------\n\n"));
-    log << footer;
+    log << "-------------------------------------------------------\n\n";
     return foundProcesses;
 }
+
 
 std::vector<ProcessHistory> ProcessChecker::getCurrentProcesses() {
     std::vector<ProcessHistory> processes;
@@ -166,16 +142,15 @@ std::vector<ProcessHistory> ProcessChecker::getCurrentProcesses() {
 std::vector<ProcessHistory> ProcessChecker::getUserAssistKeys() {
     std::vector<ProcessHistory> history;
     HKEY hKey;
-    const auto regPath = std::string(xorstr_("Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\UserAssist"));
+    const char* path = "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\UserAssist";
 
-    if (RegOpenKeyExA(HKEY_CURRENT_USER, regPath.c_str(), 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+    if (RegOpenKeyExA(HKEY_CURRENT_USER, path, 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
         char guidName[MAX_PATH];
         DWORD guidIndex = 0, guidNameSize = MAX_PATH;
 
         while (RegEnumKeyExA(hKey, guidIndex++, guidName, &guidNameSize, NULL, NULL, NULL, NULL) == ERROR_SUCCESS) {
             HKEY hSubKey;
-            const auto countKey = std::string(xorstr_("\\Count"));
-            std::string subKeyPath = regPath + "\\" + guidName + countKey;
+            std::string subKeyPath = std::string(path) + "\\" + guidName + "\\Count";
 
             if (RegOpenKeyExA(HKEY_CURRENT_USER, subKeyPath.c_str(), 0, KEY_READ, &hSubKey) == ERROR_SUCCESS) {
                 char valueName[MAX_PATH];
@@ -186,8 +161,7 @@ std::vector<ProcessHistory> ProcessChecker::getUserAssistKeys() {
                     std::string decodedName = decodeRot13(valueName);
                     std::transform(decodedName.begin(), decodedName.end(), decodedName.begin(), ::tolower);
 
-                    const auto exeExt = std::string(xorstr_(".exe"));
-                    if (decodedName.find(exeExt) != std::string::npos) {
+                    if (decodedName.find(".exe") != std::string::npos) {
                         BYTE data[1024];
                         DWORD dataSize = sizeof(data);
                         if (RegQueryValueExA(hSubKey, valueName, NULL, NULL, data, &dataSize) == ERROR_SUCCESS) {
