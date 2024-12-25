@@ -2,10 +2,7 @@
 #include "common.h"
 
 void ProcessChecker::logProcessHistory() {
-    std::ofstream log("logs.txt", std::ios::app);
-    log << R"(
----------------------- Process History ----------------------
-)";
+    std::stringstream history;
 
     auto processes = getCurrentProcesses();
     auto historicalProcesses = getUserAssistKeys();
@@ -18,15 +15,17 @@ void ProcessChecker::logProcessHistory() {
 
     std::set<std::string> uniquePaths;
     for (const auto& process : processes) {
-        if (uniquePaths.insert(process.path).second) {
-            log << fileTimeToString(process.timestamp) << "  " << process.path << "\n";
+        std::string lowerPath = process.path;
+        std::transform(lowerPath.begin(), lowerPath.end(), lowerPath.begin(), ::tolower);
+
+        if (uniquePaths.insert(lowerPath).second) {
+            history << fileTimeToString(process.timestamp) << "  " << process.path << "\n";
         }
     }
 
-    log << "-------------------------------------------------------\n\n";
+    std::ofstream log("logs.txt", std::ios::app);
+    log << history.str();
 }
-
-
 
 std::vector<ProcessInfo> ProcessChecker::findDiscordProcesses() {
     std::vector<ProcessInfo> foundProcesses;
@@ -35,11 +34,6 @@ std::vector<ProcessInfo> ProcessChecker::findDiscordProcesses() {
         {"discordcanary.exe", "Discord Canary"},
         {"discordptb.exe", "Discord PTB"}
     };
-
-    std::ofstream log("logs.txt", std::ios::app);
-    log << R"(
--------------------- Discord Analysis ----------------------
-)";
 
     HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (snapshot == INVALID_HANDLE_VALUE) return foundProcesses;
@@ -57,7 +51,6 @@ std::vector<ProcessInfo> ProcessChecker::findDiscordProcesses() {
             auto it = discordVersions.find(processName);
             if (it != discordVersions.end()) {
                 foundVersions.insert(processName);
-                log << "[+] Found " << it->second << " (PID: " << pe32.th32ProcessID << ")\n";
 
                 HANDLE processHandle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe32.th32ProcessID);
                 if (processHandle) {
@@ -75,16 +68,6 @@ std::vector<ProcessInfo> ProcessChecker::findDiscordProcesses() {
                                     info.path = modulePath;
                                     info.version = it->second;
                                     foundProcesses.push_back(info);
-
-                                    WIN32_FILE_ATTRIBUTE_DATA fileAttr;
-                                    if (GetFileAttributesExA(modulePath.c_str(), GetFileExInfoStandard, &fileAttr)) {
-                                        LARGE_INTEGER fileSize;
-                                        fileSize.LowPart = fileAttr.nFileSizeLow;
-                                        fileSize.HighPart = fileAttr.nFileSizeHigh;
-
-                                        log << "    Voice Node Size: " << fileSize.QuadPart << " bytes\n";
-                                        log << "    Base Address: 0x" << std::hex << info.baseAddress << std::dec << "\n";
-                                    }
                                 }
                             }
                         }
@@ -96,17 +79,8 @@ std::vector<ProcessInfo> ProcessChecker::findDiscordProcesses() {
     }
 
     CloseHandle(snapshot);
-
-    for (const auto& version : discordVersions) {
-        if (foundVersions.find(version.first) == foundVersions.end()) {
-            log << "[!] " << version.second << " not detected\n";
-        }
-    }
-
-    log << "-------------------------------------------------------\n\n";
     return foundProcesses;
 }
-
 
 std::vector<ProcessHistory> ProcessChecker::getCurrentProcesses() {
     std::vector<ProcessHistory> processes;
