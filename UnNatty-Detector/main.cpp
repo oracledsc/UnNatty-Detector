@@ -1,4 +1,3 @@
-
 #include "common.h"
 #include "hookdetector.h"
 #include "processchecker.h"
@@ -9,6 +8,18 @@
 #include <TlHelp32.h>
 #include <filesystem>
 #include <unordered_map>
+
+void enableConsoleColors() {
+#ifdef _WIN32
+    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (hOut != INVALID_HANDLE_VALUE) {
+        DWORD dwMode = 0;
+        GetConsoleMode(hOut, &dwMode);
+        dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+        SetConsoleMode(hOut, dwMode);
+    }
+#endif
+}
 
 void printBanner() {
     std::cout << BLUE << R"(
@@ -81,6 +92,8 @@ std::vector<VoiceNodeInfo> getVoiceNodeInfo() {
 }
 
 int main() {
+    enableConsoleColors();
+
     SetConsoleOutputCP(CP_UTF8);
     std::ofstream log("logs.txt", std::ios::trunc);
     log.close();
@@ -159,7 +172,6 @@ int main() {
                     auto result = hookDetector.analyzeModule(process);
                     if (result.foundHooks) {
                         hooksFound = true;
-                    
                     }
                     if (hookDetector.checkForImGui()) {
                         std::cout << RED << "[!] ImGui detected in " << process.version << "\n" << RESET;
@@ -199,7 +211,7 @@ int main() {
             }
         }
 
-        if (!hooksFound &&  !anyImGuiFound && !anyOpusFound) {
+        if (!hooksFound && !anyImGuiFound && !anyOpusFound) {
             std::cout << GREEN << "[+] No hooks detected in Discord\n" << RESET;
             log << "[+] No hooks detected in Discord\n\n";
         }
