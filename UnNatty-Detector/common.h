@@ -30,10 +30,18 @@
 #define STRIP_STRINGS(x) ([]{ constexpr char s[] = STRINGIZE(x); return s; }())
 
 #define PROCESS_VM_READ 0x0010
+
+#ifdef _WIN32
 #define BLUE "\033[94m"
 #define RED "\033[91m"
 #define GREEN "\033[92m"
 #define RESET "\033[0m"
+#else
+#define BLUE ""
+#define RED ""
+#define GREEN ""
+#define RESET ""
+#endif
 
 struct ProcessInfo {
     DWORD pid;
