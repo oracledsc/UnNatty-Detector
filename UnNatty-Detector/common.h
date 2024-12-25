@@ -51,3 +51,4 @@ void logToFile(const std::string& filename, const std::string& content);
 void printSeparator();
 std::string fileTimeToString(const FILETIME& ft);
 std::string bytesToHexString(const std::vector<uint8_t>& bytes);
+std::string getCurrentTimestamp();
