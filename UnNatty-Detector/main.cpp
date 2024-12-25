@@ -1,28 +1,21 @@
+
 #include "common.h"
 #include "hookdetector.h"
 #include "processchecker.h"
-#include <filesystem>
 #include <thread>
 #include <chrono>
 #include <sstream>
 #include <Psapi.h>
 #include <TlHelp32.h>
-#define WHITE "\033[37m"
-
-
-namespace fs = std::filesystem;
+#include <filesystem>
+#include <unordered_map>
 
 void printBanner() {
     std::cout << BLUE << R"(
 =======================================================
-              UnNatty-Detector v1.4.1                   
+              UnNatty-Detector v2.0.0                   
                 Created by Oracle                       
 =======================================================)" << RESET << std::endl;
-}
-
-void logConsoleOnly(const std::string& message, const char* color = "", int delayMs = 100) {
-    std::cout << color << message << RESET << std::flush;
-    std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
 }
 
 size_t getModuleMemorySize(DWORD pid, const std::string& moduleName) {
@@ -52,8 +45,14 @@ size_t getModuleMemorySize(DWORD pid, const std::string& moduleName) {
     return moduleSize;
 }
 
-std::vector<std::tuple<std::string, DWORD, size_t>> getVoiceNodeInfo() {
-    std::vector<std::tuple<std::string, DWORD, size_t>> nodeInfo;
+struct VoiceNodeInfo {
+    std::string type;
+    DWORD pid;
+    size_t size;
+};
+
+std::vector<VoiceNodeInfo> getVoiceNodeInfo() {
+    std::vector<VoiceNodeInfo> nodeInfo;
     HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (snapshot == INVALID_HANDLE_VALUE) return nodeInfo;
 
@@ -83,65 +82,154 @@ std::vector<std::tuple<std::string, DWORD, size_t>> getVoiceNodeInfo() {
 
 int main() {
     SetConsoleOutputCP(CP_UTF8);
-    std::ofstream log("logs.txt");
+    std::ofstream log("logs.txt", std::ios::trunc);
+    log.close();
 
     try {
-
         printBanner();
+        std::cout << "\n";
         ProcessChecker processChecker;
         HookDetector hookDetector;
 
+        std::cout << BLUE << "[*] Scanning for Discord processes...\n\n" << RESET;
+
         auto processes = processChecker.findDiscordProcesses();
+        auto voiceNodes = getVoiceNodeInfo();
+
         if (processes.empty()) {
-            logConsoleOnly("\n[!] No Discord installations found\n", RED);
+            std::cout << RED << "[!] No Discord installations found\n" << RESET;
+            std::cout << BLUE << "\n[*] Press Enter to exit..." << RESET;
+            std::cin.get();
             return 1;
         }
 
+        std::ofstream log("logs.txt", std::ios::app);
         log << "=======================================================\n";
-        log << "                Discord Information                     \n";
+        log << "              UnNatty-Detector v2.0.0                   \n";
+        log << "                Created by Oracle                       \n";
         log << "=======================================================\n\n";
+        log << "Scan Started: " << getCurrentTimestamp() << "\n\n";
 
-        logConsoleOnly("\n[*] Checking discord_voice.node...\n", BLUE);
-        auto voiceNodes = getVoiceNodeInfo();
+        log << "[*] Discord Process Information\n";
+        log << "-------------------------------------------------------\n\n";
+
+        std::unordered_map<std::string, bool> foundDiscordVersions = {
+            {"Discord", false},
+            {"Discord PTB", false},
+            {"Discord Canary", false}
+        };
 
         for (const auto& process : processes) {
-            log << "Discord Version: " << process.version << "\n";
-            log << "Process ID: " << process.pid << "\n";
-            log << "Base Address: 0x" << std::hex << process.baseAddress << std::dec << "\n";
+            for (const auto& node : voiceNodes) {
+                if (!foundDiscordVersions[node.type] && node.type == process.version) {
+                    std::cout << GREEN << "[+] Found " << node.type << " (PID: " << process.pid << ")\n" << RESET;
+                    std::cout << BLUE << "    Voice Node Found at: 0x" << std::hex << process.baseAddress << std::dec << "\n";
+                    std::cout << "    Voice Node Size: " << node.size << " bytes\n\n" << RESET;
 
-            for (const auto& [type, pid, size] : voiceNodes) {
-                if (type == process.version) {
-                    log << "Voice Node Size: " << size << " bytes\n";
-                    break;
+                    log << "[+] Found " << node.type << " (PID: " << process.pid << ")\n";
+                    log << "    Voice Node Found at: 0x" << std::hex << process.baseAddress << std::dec << "\n";
+                    log << "    Voice Node Size: " << node.size << " bytes\n\n";
+                    foundDiscordVersions[node.type] = true;
                 }
             }
-            log << "-------------------------------------------------------\n\n";
-
-            logConsoleOnly("[+] Found " + process.version + "\n", GREEN);
         }
 
-        logConsoleOnly("\n[*] Logging process history...\n", BLUE);
-        processChecker.logProcessHistory();
+        for (const auto& [version, found] : foundDiscordVersions) {
+            if (!found) {
+                std::cout << RED << "[!] " << version << " not detected\n" << RESET;
+                log << "[!] " << version << " not detected\n\n";
+            }
+        }
 
-        log << "=======================================================\n";
-        log << "                    Hook Analysis                       \n";
+        std::cout << BLUE << "\n[*] Running comprehensive analysis...\n" << RESET;
+        std::cout << "================================================================================\n\n";
+
+        log << "[*] Hook Analysis Results\n";
+        log << "-------------------------------------------------------\n\n";
+
+        bool hooksFound = false;
+        bool anyImGuiFound = false;
+        bool anyOpusFound = false;
+        for (const auto& process : processes) {
+            for (const auto& node : voiceNodes) {
+                if (node.type == process.version) {
+                    std::cout << GREEN << "[+] Analyzing " << process.version << "...\n\n" << RESET;
+                    log << "[+] Analyzing " << process.version << "...\n\n";
+
+                    auto result = hookDetector.analyzeModule(process);
+                    if (result.foundHooks) {
+                        hooksFound = true;
+                    
+                    }
+                    if (hookDetector.checkForImGui()) {
+                        std::cout << RED << "[!] ImGui detected in " << process.version << "\n" << RESET;
+                        log << "[!] ImGui detected in " << process.version << "\n";
+                        anyImGuiFound = true;
+                    }
+                    if (hookDetector.checkForOpusHooks()) {
+                        std::cout << RED << "[!] Opus Hooks detected in " << process.version << "\n" << RESET;
+                        log << "[!] Opus Hooks detected in " << process.version << "\n";
+                        anyOpusFound = true;
+                    }
+
+                    auto hooks = hookDetector.detectAllHooks(process.pid);
+                    if (!hooks.empty()) {
+                        std::cout << RED << "[!] ReadOnly hooks detected in " << process.version << "\n" << RESET;
+                        log << "[!] ReadOnly hooks detected in " << process.version << "\n";
+                        for (const auto& hook : hooks) {
+                            log << "    Hook at: 0x" << std::hex << hook.moduleBase << " in " << hook.modulePath << "\n";
+                        }
+                    }
+
+                    if (!hookDetector.validateVoiceNodeIntegrity(process.path, process.pid)) {
+                        std::cout << RED << "[!] Voice node integrity check failed for " << process.version << "\n" << RESET;
+                        log << "[!] Voice node integrity check failed for " << process.version << "\n";
+                    }
+
+                    if (hookDetector.detectVTableHooks(process)) {
+                        std::cout << RED << "[!] VTable hooks detected in " << process.version << "\n" << RESET;
+                        log << "[!] VTable hooks detected in " << process.version << "\n";
+                    }
+
+                    if (hookDetector.detectPageGuardHooks()) {
+                        std::cout << RED << "[!] PAGE_GUARD hooks detected in " << process.version << "\n" << RESET;
+                        log << "[!] PAGE_GUARD hooks detected in " << process.version << "\n";
+                    }
+                }
+            }
+        }
+
+        if (!hooksFound &&  !anyImGuiFound && !anyOpusFound) {
+            std::cout << GREEN << "[+] No hooks detected in Discord\n" << RESET;
+            log << "[+] No hooks detected in Discord\n\n";
+        }
+
+        std::cout << "\033[37m\n================================================================================\n\033[0m";
+
+        log << "\n=======================================================\n";
+        log << "                  Process History                       \n";
         log << "=======================================================\n\n";
 
-        logConsoleOnly("\n[*] Analyzing for hooks...\n\n", BLUE);
-        logConsoleOnly("================================================================================\n");
-        for (const auto& process : processes) {
-            logConsoleOnly("\n[+] Analyzing " + process.version + "...\n\n", GREEN);
-            auto result = hookDetector.analyzeModule(process);
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        }
-        logConsoleOnly("\n[*] Results saved to logs.txt\n", BLUE);
-        logConsoleOnly("[*] Press Enter to exit...", BLUE);
+        log.close();
+        processChecker.logProcessHistory();
+
+        log.open("logs.txt", std::ios::app);
+        log << "\nScan Completed: " << getCurrentTimestamp() << "\n";
+        log << "=======================================================\n\n";
+
+        std::cout << BLUE << "\n[*] All results have been saved to logs.txt\n" << RESET;
+        std::cout << BLUE << "[*] Press Enter to exit..." << RESET;
         std::cin.get();
         return 0;
-
     }
     catch (const std::exception& e) {
-        logConsoleOnly(std::string("\n[!] Error: ") + e.what() + "\n[!] Run as administrator\n", RED);
+        std::cout << RED << "\n[!] Error: " << e.what() << "\n[!] Run as administrator\n" << RESET;
+
+        std::ofstream log("logs.txt", std::ios::app);
+        log << "\n[!] Error: " << e.what() << "\n[!] Run as administrator\n";
+
+        std::cout << BLUE << "\n[*] Press Enter to exit..." << RESET;
+        std::cin.get();
         return 1;
     }
 }
