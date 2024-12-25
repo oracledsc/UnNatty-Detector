@@ -1,6 +1,6 @@
 # UnNatty Detector v2.0.0
 
-UnNatty Detector is a comprehensive tool designed to analyze process memory and detect anomalies, with a focus on identifying potential hooks and tampering in Discord's voice communication module.
+UnNatty Detector is made to detect hook on Discord (for the loudmic community, to avoid cheaters). Keep in mind that everything can be bypassed, I will continue to maintain this, but do not only rely on it, if you're pretty sure someone is cheating, always prefer a simple DB Check, how to do so ? DM oracledsc for the db checker link. Thanks for using my project, I took alot of time to make it <3
 
 ## Features
 
@@ -53,8 +53,8 @@ UnNatty Detector is a comprehensive tool designed to analyze process memory and 
 
 ## Usage
 
-1. Run the executable
-2. Allow scanning of running Discord process
+1. Install it from the [RELEASE PAGE](https://github.com/oracledsc/UnNatty-Detector/releases/tag/release)
+2. Run the executable
 3. Review `logs.txt` for detailed findings
 
 ### Caution
