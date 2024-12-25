@@ -1,75 +1,86 @@
-# UnNatty Detector v1.4.1
+# UnNatty Detector v2.0.0
 
-UnNatty Detector is a tool designed to analyze the memory of processes and detect any anomalies, including hooks or altered `discord_voice.node` files. It provides insights into potential tampering and aids in identifying suspicious behavior.
+UnNatty Detector is a comprehensive tool designed to analyze process memory and detect anomalies, with a focus on identifying potential hooks and tampering in Discord's voice communication module.
 
 ## Features
 
-### 1. Hook Detection
-- Scans the memory of the loaded `discord_voice.node` process.
-- Detects Address-Of-Byte (AOB) changes and abnormal Assembly (ASM) code.
-- Alerts when hooks are found and logs them for further analysis.
+### 1. Advanced Hook Detection
+- Comprehensive scan of process memory for various hook types:
+  - Inline Hooks
+  - Import Address Table (IAT) Hooks
+  - Virtual Table (VTable) Hooks
+  - Page Guard Hooks
+- Detailed pattern matching for suspicious code modifications
 
-### 2. Process History Inspection
-- Tracks the process history to detect patterns of injection or suspicious activity.
-- Analyzes process creation and termination behaviors for irregularities.
+### 2. Module and Node Integrity Verification
+- Validates integrity of `discord_voice.node`
+- Compares loaded modules against original file
+- Checks for unauthorized modifications in executable sections
 
-### 3. Byte Comparison
-- Compares the file size of the loaded `discord_voice.node` with the latest official version.
-- Identifies outdated or potentially tampered files.
+### 3. Audio Hook Specific Detection
+- Specialized scanning for audio-related hooks
+- Identifies suspicious signatures and hex patterns
+- Focuses on Discord voice communication modules
 
-### 4. Detailed Logging
-- Generates a `logs.txt` file with:
-  - Details on detected hooks.
-  - Anomalies in memory.
-  - Process history for manual inspection.
-- Useful for advanced debugging and verification.
+### 4. ImGui and Extended Signature Detection
+- Scans for potential injection indicators
+- Detects ImGui-related signatures
+- Identifies suspicious module names and string patterns
 
-### 5. User-Friendly Alerts
-- Displays warnings such as:
-  ```
-  Hook detected! Analyze `logs.txt` for more information.
-  ```
-- Provides a fallback message:
-  ```
-  No hooks detected, but this doesn't guarantee safety. Check `logs.txt` and review process history.
-  ```
+### 5. Comprehensive Logging
+- Generates detailed `logs.txt` with:
+  - Timestamp of detection
+  - Specific module and hook information
+  - Detected suspicious patterns
+  - Memory region details
 
----
+## Technical Capabilities
 
-## How to Compile and Use
+- Memory scanning across different protection levels
+- Multi-module analysis for Discord variants (Discord, DiscordCanary, DiscordPTB)
+- Advanced byte-level comparison techniques
 
-### Build from Source
-If you don’t trust the provided executable, you can build the tool from source:
-1. Ensure you have Visual Studio 2022 installed.
-2. Clone the repository:
-   ```bash
-   git clone https://github.com/oracledsc/UnNatty-Detector.git
-   cd UnNatty-Detector
-   ```
-3. Open the project in Visual Studio 2022 and build the solution in Release x64
-4. For assistance, DM `oracledsc` on Discord.
+## Compilation Requirements
 
-### Download Precompiled Binary
-You can directly download the precompiled binary from the [Releases Page](https://github.com/oracledsc/UnNatty-Detector/releases/download/release/UnNatty-Detector.exe).
+- Visual Studio 2022
+- Windows SDK
+- C++17 Standard
+- Dependencies:
+  - Windows API
+  - Toolhelp32 Library
+  - ImageHlp Library
+  - WinTrust Library
 
-### Usage
-1. **Send the Tool**: Share the `UnNatty-Detector.exe` file with the target user.
-2. **Make sure he doesn't restart Discord or leave the VC!**
-3. **Run on Screenshare**: Instruct the user to run the tool while screensharing.
-4. **Analyze Results**:
-   - If a hook is detected, the tool will alert: `Hook detected! Analyze logs.txt for more information.`
-   - If no hook is detected, the tool will say so but advise checking the `logs.txt` file manually.
-   - The `logs.txt` file includes:
-     - Process list: Helps identify suspicious processes like Abaddon or hooks.
-     - Voice node details: Includes file size, offsets, etc., to verify against the latest Discord voice node.
-     - More Infos if a hook has been detected.
+## Usage
 
-### What to Do If Someone Bypasses It
-If someone bypasses the tool or it fails to detect a hook:
-- DM `oracledsc` on Discord for support and fixes.
-- The tool is basic for now, but no one has been able to bypass it yet.
-  
----
+1. Run the executable
+2. Allow scanning of running Discord process
+3. Review `logs.txt` for detailed findings
 
-## Disclaimer
-This tool is for educational purposes only. Use it responsibly and in accordance with all applicable laws and regulations.
+### Caution
+- Tool is for educational and security research purposes
+- Use responsibly and ethically
+- No guarantee of 100% detection
+
+## License
+
+Copyright (c) 2024 UnNatty Detector
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+## Contact
+For support or inquiries, contact oracledsc on discord
