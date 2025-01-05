@@ -1,4 +1,4 @@
-# UnNatty Detector v2.0.0
+# UnNatty Detector v2.1.0
 
 UnNatty Detector is made to detect hook on Discord (for the loudmic community, to avoid cheaters). Keep in mind that everything can be bypassed, I will continue to maintain this, but do not only rely on it, if you're pretty sure someone is cheating, always prefer a simple DB Check, how to do so ? DM oracledsc for the db checker link. Thanks for using my project, It took alot of time to make it <3
 
