@@ -7,6 +7,7 @@ UnNatty Detector is made to detect hook on Discord (for the loudmic community, t
 ### 1. Advanced Hook Detection
 - Comprehensive scan of process memory for various hook types:
   - Inline Hooks
+  - Alot of external pc checks (credit to cosa)
   - Import Address Table (IAT) Hooks
   - Virtual Table (VTable) Hooks
   - Page Guard Hooks
