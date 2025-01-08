@@ -304,7 +304,7 @@ bool IsWhitelisted(const char* processName) {
     return false;
 }
 
-AudioHookResult HookDetector::detectAudioHooks(DWORD processId) {
+AudioHookResult HookDetector::detectOtherHooks(DWORD processId) {
     std::cout << BLUE << "[*] Checking for Audio Hooks...\n" << RESET;
     AudioHookResult result;
     result.hasAudioHooks = false;
