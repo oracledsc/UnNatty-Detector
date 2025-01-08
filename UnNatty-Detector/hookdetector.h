@@ -94,6 +94,28 @@ private:
         "AudioInterceptor"
     };// will prob implement later
 
+    const std::vector<std::string> opusSignatures = {
+    "opus_encoder",
+    "opus_decoder",
+    "opus_encode",
+    "opus_decode",
+    "opusfile",
+    "opus_custom",
+    "opus_multistream",
+    "opus_repacketizer",
+    "opus_packet",
+    "opus_lib",
+    "opus_projects",
+    "libopus",
+    "opus_projection",
+    "opus_encode_float",
+    "opus_decode_float",
+    "opus_pcm",
+    "opus_stream",
+    "opus_voice",
+    "opus_get_version_string"
+
+    };
     const std::vector<std::vector<uint8_t>> MINHOOK_HEX_PATTERNS = {
         {0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xE0},
     };// will prob implement later
