@@ -315,6 +315,7 @@ int main() {
             std::cout << GREEN << "[+] No hooks detected in Discord\n" << RESET;
             log << "[+] No hooks detected in Discord\n\n";
         }
+        std::cout << BLUE << "DO NOT CLOSE THE FILE THE CHECKS ARENT FINISHED!\n" << RESET;
         logger.logPrefetch();
         logger.logUsnJournal();
         logger.logTaskList();
