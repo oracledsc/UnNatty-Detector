@@ -174,15 +174,6 @@ bool HookDetector::checkForOpusHooks() {
         L"DiscordPTB.exe"
     };
 
-    std::vector<std::string> opusSignatures = {
-        "opus_encoder", "opus_decoder", "opus_encode", "opus_decode",
-        "opusfile", "opus_custom", "opus_multistream",
-        "opus_repacketizer", "opus_packet", "opus_lib",
-        "opus_projects", "libopus", "opus_projection",
-        "opus_encode_float", "opus_decode_float",
-        "opus_pcm", "opus_stream", "opus_voice", "libopus"
-    };
-
     HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (snapshot != INVALID_HANDLE_VALUE) {
         PROCESSENTRY32W processEntry;
@@ -202,8 +193,6 @@ bool HookDetector::checkForOpusHooks() {
 
                             if (Module32FirstW(moduleSnap, &me32)) {
                                 do {
-                                    if (wcsstr(me32.szModule, L"discord_voice.node")) continue;
-
                                     MODULEINFO modInfo;
                                     if (GetModuleInformation(hProcess, me32.hModule, &modInfo, sizeof(MODULEINFO))) {
                                         if (modInfo.SizeOfImage > 4096 && modInfo.SizeOfImage < 100 * 1024 * 1024) {
@@ -213,20 +202,8 @@ bool HookDetector::checkForOpusHooks() {
                                             if (ReadProcessMemory(hProcess, modInfo.lpBaseOfDll, moduleBuffer.data(),
                                                 modInfo.SizeOfImage, &bytesRead)) {
 
-                                                char modNameA[MAX_PATH];
-                                                WideCharToMultiByte(CP_UTF8, 0, me32.szModule, -1,
-                                                    modNameA, sizeof(modNameA), NULL, NULL);
-                                                std::string lowerModName = modNameA;
-                                                std::transform(lowerModName.begin(), lowerModName.end(),
-                                                    lowerModName.begin(), ::tolower);
-
-                                                bool moduleNameMatch = false;
-                                                for (const auto& sig : opusSignatures) {
-                                                    if (lowerModName.find(sig) != std::string::npos) {
-                                                        moduleNameMatch = true;
-                                                        break;
-                                                    }
-                                                }
+                                                std::wstring fullPath = me32.szExePath;
+                                                std::string modPath(fullPath.begin(), fullPath.end());
 
                                                 std::string moduleContent(
                                                     reinterpret_cast<char*>(moduleBuffer.data()),
@@ -235,41 +212,45 @@ bool HookDetector::checkForOpusHooks() {
                                                 std::transform(moduleContent.begin(), moduleContent.end(),
                                                     moduleContent.begin(), ::tolower);
 
-                                                bool stringDetected = false;
+                                                bool detected = false;
+                                                std::string matchedType;
                                                 std::string matchedSig;
+
                                                 for (const auto& sig : opusSignatures) {
                                                     if (moduleContent.find(sig) != std::string::npos) {
-                                                        stringDetected = true;
+                                                        detected = true;
+                                                        matchedType = "String signature";
                                                         matchedSig = sig;
                                                         break;
                                                     }
                                                 }
 
-                                                bool hexPatternDetected = false;
-                                                for (const auto& pattern : AUDIO_HEX_PATTERNS) {
-                                                    auto it = std::search(moduleBuffer.begin(), moduleBuffer.end(),
-                                                        pattern.begin(), pattern.end());
-                                                    if (it != moduleBuffer.end()) {
-                                                        hexPatternDetected = true;
-                                                        break;
+                                                if (!detected) {
+                                                    for (const auto& pattern : AUDIO_HEX_PATTERNS) {
+                                                        auto it = std::search(moduleBuffer.begin(), moduleBuffer.end(),
+                                                            pattern.begin(), pattern.end());
+                                                        if (it != moduleBuffer.end()) {
+                                                            detected = true;
+                                                            matchedType = "Hex pattern";
+                                                            matchedSig = "Binary pattern match";
+                                                            break;
+                                                        }
                                                     }
                                                 }
 
-                                                if (moduleNameMatch || stringDetected || hexPatternDetected) {
+                                                if (detected) {
                                                     found = true;
-
-                                                    std::cout << RESET;
-
+                                                    std::cout << RED << "[!] Opus hooks detected in: " << modPath << "\n" << RESET;
                                                     std::ofstream log("logs.txt", std::ios::app);
                                                     log << "\n[OPUS DETECTION]\n";
-                                                    log << "Module: " << modNameA << "\n";
+                                                    log << "Module Path: " << modPath << "\n";
+                                                    log << "Base Address: 0x" << std::hex << (uintptr_t)me32.hModule << std::dec << "\n";
+                                                    log << "Module Size: " << modInfo.SizeOfImage << " bytes\n";
+                                                    log << "Detection Type: " << matchedType << "\n";
+                                                    if (matchedType == "String signature") {
+                                                        log << "Matched Signature: " << matchedSig << "\n";
+                                                    }
                                                     log << "Timestamp: " << getCurrentTimestamp() << "\n";
-                                                    if (moduleNameMatch)
-                                                        log << "Detection: Module Name Match\n";
-                                                    if (stringDetected)
-                                                        log << "Detection: String Signature (" << matchedSig << ")\n";
-                                                    if (hexPatternDetected)
-                                                        log << "Detection: Hex Pattern Match\n";
                                                     log.close();
                                                 }
                                             }
@@ -286,7 +267,6 @@ bool HookDetector::checkForOpusHooks() {
         }
         CloseHandle(snapshot);
     }
-
     return found;
 }
 
@@ -455,7 +435,7 @@ bool HookDetector::checkForImGui() {
                         HANDLE moduleSnap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, processEntry.th32ProcessID);
                         if (moduleSnap != INVALID_HANDLE_VALUE) {
                             MODULEENTRY32W me32;
-                            me32.dwSize = sizeof(me32);
+                            me32.dwSize = sizeof(MODULEENTRY32W);
 
                             if (Module32FirstW(moduleSnap, &me32)) {
                                 do {
@@ -468,20 +448,8 @@ bool HookDetector::checkForImGui() {
                                             if (ReadProcessMemory(hProcess, modInfo.lpBaseOfDll, moduleBuffer.data(),
                                                 modInfo.SizeOfImage, &bytesRead)) {
 
-                                                char modNameA[MAX_PATH];
-                                                WideCharToMultiByte(CP_UTF8, 0, me32.szModule, -1,
-                                                    modNameA, sizeof(modNameA), NULL, NULL);
-                                                std::string lowerModName = modNameA;
-                                                std::transform(lowerModName.begin(), lowerModName.end(),
-                                                    lowerModName.begin(), ::tolower);
-
-                                                bool moduleNameMatch = false;
-                                                for (const auto& sig : EXTENDED_IMGUI_SIGNATURES) {
-                                                    if (lowerModName.find(sig) != std::string::npos) {
-                                                        moduleNameMatch = true;
-                                                        break;
-                                                    }
-                                                }
+                                                std::wstring fullPath = me32.szExePath;
+                                                std::string modPath(fullPath.begin(), fullPath.end());
 
                                                 std::string moduleContent(
                                                     reinterpret_cast<char*>(moduleBuffer.data()),
@@ -490,34 +458,28 @@ bool HookDetector::checkForImGui() {
                                                 std::transform(moduleContent.begin(), moduleContent.end(),
                                                     moduleContent.begin(), ::tolower);
 
-                                                bool stringDetected = false;
+                                                bool detected = false;
                                                 std::string matchedSig;
+
                                                 for (const auto& sig : EXTENDED_IMGUI_SIGNATURES) {
                                                     if (moduleContent.find(sig) != std::string::npos) {
-                                                        stringDetected = true;
+                                                        detected = true;
                                                         matchedSig = sig;
                                                         break;
                                                     }
                                                 }
 
-                                                if (moduleNameMatch || stringDetected) {
+                                                if (detected) {
                                                     found = true;
-
-                                                    if (moduleNameMatch)
-                                                        std::cout << "    Detection: Module Name Match\n";
-                                                    if (stringDetected)
-                                                        std::cout << "    Detection: String Signature (" << matchedSig << ")\n";
-
-                                                    std::cout << RESET;
+                                                    std::cout << RED << "[!] ImGui detected in: " << modPath << "\n" << RESET;
 
                                                     std::ofstream log("logs.txt", std::ios::app);
                                                     log << "\n[IMGUI DETECTION]\n";
-                                                    log << "Module: " << modNameA << "\n";
+                                                    log << "Module Path: " << modPath << "\n";
+                                                    log << "Base Address: 0x" << std::hex << (uintptr_t)me32.hModule << std::dec << "\n";
+                                                    log << "Module Size: " << modInfo.SizeOfImage << " bytes\n";
+                                                    log << "Matched Signature: " << matchedSig << "\n";
                                                     log << "Timestamp: " << getCurrentTimestamp() << "\n";
-                                                    if (moduleNameMatch)
-                                                        log << "Detection: Module Name Match\n";
-                                                    if (stringDetected)
-                                                        log << "Detection: String Signature (" << matchedSig << ")\n";
                                                     log.close();
                                                 }
                                             }
