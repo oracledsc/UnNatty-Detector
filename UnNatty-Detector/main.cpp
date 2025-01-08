@@ -76,7 +76,7 @@ void enableConsoleColors() {
 void printBanner() {
     std::cout << BLUE << R"(
 =======================================================
-              UnNatty-Detector v2.1.0                   
+              UnNatty-Detector v2.1.1                   
                  Created by Oracle              
 =======================================================)" << RESET << std::endl;
 }
@@ -190,12 +190,6 @@ int main() {
 
     try {
         SystemLogger logger;
-        logger.logPrefetch();
-        logger.logUsnJournal();
-        logger.logTaskList();
-        logger.logFilteredTaskList();
-        logger.logZombieProcesses();
-        logger.logRegistryKeys();
 
         printBanner();
         ProcessChecker processChecker;
@@ -215,7 +209,7 @@ int main() {
 
         std::ofstream log("logs.txt", std::ios::trunc);
         log << "=======================================================\n";
-        log << "              UnNatty-Detector v2.1.0                   \n";
+        log << "              UnNatty-Detector v2.1.1                   \n";
         log << "Created by Oracle (Credit to Cosa for external detection)\n";
         log << "=======================================================\n\n";
         log << "Scan Started: " << getCurrentTimestamp() << "\n\n";
@@ -321,7 +315,12 @@ int main() {
             std::cout << GREEN << "[+] No hooks detected in Discord\n" << RESET;
             log << "[+] No hooks detected in Discord\n\n";
         }
-
+        logger.logPrefetch();
+        logger.logUsnJournal();
+        logger.logTaskList();
+        logger.logFilteredTaskList();
+        logger.logZombieProcesses();
+        logger.logRegistryKeys();
         std::cout << "\033[37m\n================================================================================\n\033[0m";
 
         log << "\n=======================================================\n";
