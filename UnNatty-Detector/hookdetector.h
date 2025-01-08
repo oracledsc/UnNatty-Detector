@@ -53,7 +53,7 @@ public:
     bool detectPageGuardHooks();
     bool forceLoadOriginalNode(const std::string& nodePath);
     bool checkForMinHook();// will prob implement later
-    AudioHookResult detectAudioHooks(DWORD processId);
+    AudioHookResult detectOtherHooks(DWORD processId);
     bool checkForOpusHooks();
     bool checkForImGui();
     void scanModuleForSuspiciousPatterns(const std::vector<uint8_t>& moduleData, const std::string& moduleName);
