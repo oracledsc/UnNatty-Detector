@@ -355,6 +355,49 @@ std::vector<ModuleInfo> WhyIsAscendSuchABadCoder() {
                                     info.moduleEntry = moduleEntry;
                                     info.found = true;
                                     info.processName = processEntry.szExeFile;
+
+                                    wchar_t localAppData[MAX_PATH];
+                                    if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, localAppData))) {
+                                        std::filesystem::path baseDir(localAppData);
+                                        std::wstring discordType;
+
+                                        if (info.processName.find(L"DiscordCanary") != std::wstring::npos) {
+                                            discordType = L"DiscordCanary";
+                                        }
+                                        else if (info.processName.find(L"DiscordPTB") != std::wstring::npos) {
+                                            discordType = L"DiscordPTB";
+                                        }
+                                        else {
+                                            discordType = L"Discord";
+                                        }
+
+                                        std::filesystem::path discordPath = baseDir / discordType;
+                                        if (std::filesystem::exists(discordPath)) {
+                                            std::wstring latestVersion;
+                                            std::filesystem::path latestPath;
+
+                                            for (const auto& entry : std::filesystem::directory_iterator(discordPath)) {
+                                                if (entry.is_directory() && entry.path().filename().wstring().find(L"app-") == 0) {
+                                                    std::wstring version = entry.path().filename().wstring().substr(4);
+                                                    if (version > latestVersion) {
+                                                        latestVersion = version;
+                                                        latestPath = entry.path();
+                                                    }
+                                                }
+                                            }
+
+                                            if (!latestPath.empty()) {
+                                                auto modulePath = latestPath / L"modules";
+                                                for (const auto& entry : std::filesystem::directory_iterator(modulePath)) {
+                                                    if (entry.is_directory() && entry.path().filename().wstring().find(L"discord_voice") == 0) {
+                                                        info.cleanNodePath = (entry.path() / L"discord_voice" / L"discord_voice.node").wstring();
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
                                     modules.push_back(info);
                                 }
                             } while (Module32NextW(moduleSnap, &moduleEntry));
