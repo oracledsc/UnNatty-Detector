@@ -6,9 +6,19 @@
 #include <imagehlp.h>
 #include <tlhelp32.h>
 #include <chrono>
+#include <Shlobj.h>
 #include <thread>
+
 #pragma comment(lib, "wintrust.lib")
 #pragma comment(lib, "imagehlp.lib")
+
+std::string ws2s(const std::wstring& wstr) {
+    if (wstr.empty()) return "";
+    int size_needed = WideCharToMultiByte(CP_UTF8, 0, wstr.data(), (int)wstr.size(), nullptr, 0, nullptr, nullptr);
+    std::string strTo(size_needed, 0);
+    WideCharToMultiByte(CP_UTF8, 0, wstr.data(), (int)wstr.size(), strTo.data(), size_needed, nullptr, nullptr);
+    return strTo;
+}
 
 const wchar_t* boxChars[] = {
     L"-------------------------------------------------------",
@@ -65,103 +75,239 @@ HookDetectionResult HookDetector::analyzeModule(const ProcessInfo& processInfo) 
     result.foundHooks = false;
     bool hookDetectedPrinted = false;
 
-    HANDLE fileHandle = CreateFileA(processInfo.path.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (fileHandle == INVALID_HANDLE_VALUE) return result;
+    try {
+        wchar_t localAppData[MAX_PATH];
+        std::wstring voiceNodePath;
+        std::wstring discordType;
 
-    HANDLE processHandle = OpenProcess(PROCESS_VM_READ, FALSE, processInfo.pid);
-    if (processHandle == NULL) {
-        CloseHandle(fileHandle);
-        return result;
-    }
+        HANDLE procHandle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processInfo.pid);
+        if (procHandle) {
+            wchar_t processPath[MAX_PATH];
+            DWORD size = MAX_PATH;
+            if (QueryFullProcessImageNameW(procHandle, 0, processPath, &size)) {
+                std::wstring fullPath(processPath);
+                std::filesystem::path exePath(fullPath);
+                std::wstring processName = exePath.filename().wstring();
 
-    DWORD fileSize = GetFileSize(fileHandle, NULL);
-    std::vector<uint8_t> fileData(fileSize);
-    DWORD bytesRead = 0;
-    if (!ReadFile(fileHandle, fileData.data(), fileSize, &bytesRead, NULL)) {
-        CloseHandle(fileHandle);
-        CloseHandle(processHandle);
-        return result;
-    }
-    CloseHandle(fileHandle);
+                if (processName.find(L"DiscordCanary") != std::wstring::npos) {
+                    discordType = L"DiscordCanary";
+                }
+                else if (processName.find(L"DiscordPTB") != std::wstring::npos) {
+                    discordType = L"DiscordPTB";
+                }
+                else {
+                    discordType = L"Discord";
+                }
+            }
+            CloseHandle(procHandle);
+        }
 
-    IMAGE_DOS_HEADER dosHeader;
-    IMAGE_NT_HEADERS ntHeaders;
+        if (discordType.empty()) {
+            discordType = L"Discord";
+        }
 
-    ReadProcessMemory(processHandle, (LPCVOID)processInfo.baseAddress, &dosHeader, sizeof(dosHeader), NULL);
-    ReadProcessMemory(processHandle, (LPCVOID)(processInfo.baseAddress + dosHeader.e_lfanew), &ntHeaders, sizeof(ntHeaders), NULL);
+        if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, localAppData))) {
+            std::filesystem::path baseDir(localAppData);
+            std::filesystem::path discordPath = baseDir / discordType;
 
-    for (int i = 0; i < ntHeaders.FileHeader.NumberOfSections; i++) {
-        IMAGE_SECTION_HEADER sectionHeader;
-        ReadProcessMemory(processHandle,
-            (LPCVOID)(processInfo.baseAddress + dosHeader.e_lfanew + sizeof(IMAGE_NT_HEADERS) + (i * sizeof(IMAGE_SECTION_HEADER))),
-            &sectionHeader, sizeof(sectionHeader), NULL);
+            if (std::filesystem::exists(discordPath)) {
+                std::wstring latestVersion;
+                std::filesystem::path latestPath;
 
-        if (sectionHeader.Characteristics & IMAGE_SCN_MEM_EXECUTE) {
-            std::vector<uint8_t> memoryData(sectionHeader.Misc.VirtualSize);
-            ReadProcessMemory(processHandle,
-                (LPCVOID)(processInfo.baseAddress + sectionHeader.VirtualAddress),
-                memoryData.data(), sectionHeader.Misc.VirtualSize, NULL);
+                for (const auto& entry : std::filesystem::directory_iterator(discordPath)) {
+                    if (entry.is_directory() && entry.path().filename().wstring().find(L"app-") == 0) {
+                        std::wstring version = entry.path().filename().wstring().substr(4);
+                        if (version > latestVersion) {
+                            latestVersion = version;
+                            latestPath = entry.path();
+                        }
+                    }
+                }
 
-            for (size_t offset = 0; offset < memoryData.size() - 10; offset++) {
-                bool foundHook = false;
-                for (const auto& pattern : HOOK_PATTERNS) {
-                    if (offset + pattern.pattern.size() <= memoryData.size()) {
-                        if (std::equal(pattern.pattern.begin(), pattern.pattern.end(), memoryData.begin() + offset)) {
-                            size_t fileOffset = sectionHeader.PointerToRawData + offset;
-                            if (fileOffset + pattern.pattern.size() <= fileData.size() &&
-                                !std::equal(pattern.pattern.begin(), pattern.pattern.end(),
-                                    fileData.begin() + fileOffset)) {
-                                result.foundHooks = true;
-                                result.sectionName = std::string((char*)sectionHeader.Name, 8);
-                                result.offset = sectionHeader.VirtualAddress + offset;
-                                result.hookType = pattern.name;
-
-                                result.originalBytes.assign(
-                                    fileData.begin() + fileOffset,
-                                    fileData.begin() + fileOffset + pattern.pattern.size()
-                                );
-                                result.modifiedBytes.assign(
-                                    memoryData.begin() + offset,
-                                    memoryData.begin() + offset + pattern.pattern.size()
-                                );
-
-                                writeHookDetails("logs.txt", result, true);
-
-                                if (!hookDetectedPrinted) {
-                                    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-                                    SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_INTENSITY);
-                                    for (const auto& line : boxChars) {
-                                        std::wcout << line << std::endl;
-                                    }
-                                    hookDetectedPrinted = true;
-                                }
-                                foundHook = true;
+                if (!latestPath.empty()) {
+                    auto modulePath = latestPath / L"modules";
+                    for (const auto& entry : std::filesystem::directory_iterator(modulePath)) {
+                        if (entry.is_directory() && entry.path().filename().wstring().find(L"discord_voice") == 0) {
+                            std::filesystem::path nodePath = entry.path() / L"discord_voice" / L"discord_voice.node";
+                            if (std::filesystem::exists(nodePath)) {
+                                voiceNodePath = nodePath.wstring();
                                 break;
                             }
                         }
                     }
                 }
+            }
+        }
 
-                if (!foundHook) {
-                    size_t fileOffset = sectionHeader.PointerToRawData + offset;
-                    if (fileOffset + 10 <= fileData.size()) {
-                        if (!std::equal(fileData.begin() + fileOffset, fileData.begin() + fileOffset + 10, memoryData.begin() + offset)) {
-                            result.sectionName = std::string((char*)sectionHeader.Name, 8);
-                            result.offset = sectionHeader.VirtualAddress + offset;
-                            result.hookType = "Memory Patch";
+        HANDLE fileHandle = CreateFileA(processInfo.path.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (fileHandle == INVALID_HANDLE_VALUE) {
+            std::cout << RED << "[!] Failed to open process file\n" << RESET;
+            std::ofstream log("logs.txt", std::ios::app);
+            log << "\n[MEMORY PATCH DETECTED]\n";
+            log << "Type: Cannot open process file\n";
+            log << "Error Code: " << GetLastError() << "\n";
+            log << "Timestamp: " << getCurrentTimestamp() << "\n";
+            log.close();
+            result.foundHooks = true;
+            return result;
+        }
 
-                            result.originalBytes.assign(fileData.begin() + fileOffset, fileData.begin() + fileOffset + 10);
-                            result.modifiedBytes.assign(memoryData.begin() + offset, memoryData.begin() + offset + 10);
+        HANDLE processHandle = OpenProcess(PROCESS_VM_READ, FALSE, processInfo.pid);
+        if (processHandle == NULL) {
+            std::cout << RED << "[!] Failed to open process for memory reading\n" << RESET;
+            std::ofstream log("logs.txt", std::ios::app);
+            log << "\n[MEMORY PATCH DETECTED]\n";
+            log << "Type: Cannot read process memory - Access denied\n";
+            log << "Process ID: " << processInfo.pid << "\n";
+            log << "Error Code: " << GetLastError() << "\n";
+            log << "Timestamp: " << getCurrentTimestamp() << "\n";
+            log.close();
+            CloseHandle(fileHandle);
+            result.foundHooks = true;
+            return result;
+        }
 
-                            writeHookDetails("logs.txt", result, false);
+        DWORD fileSize = GetFileSize(fileHandle, NULL);
+        std::vector<uint8_t> fileData(fileSize);
+        DWORD bytesRead = 0;
+        if (!ReadFile(fileHandle, fileData.data(), fileSize, &bytesRead, NULL)) {
+            CloseHandle(fileHandle);
+            CloseHandle(processHandle);
+            return result;
+        }
+        CloseHandle(fileHandle);
+
+        IMAGE_DOS_HEADER dosHeader;
+        IMAGE_NT_HEADERS ntHeaders;
+
+        ReadProcessMemory(processHandle, (LPCVOID)processInfo.baseAddress, &dosHeader, sizeof(dosHeader), NULL);
+        ReadProcessMemory(processHandle, (LPCVOID)(processInfo.baseAddress + dosHeader.e_lfanew), &ntHeaders, sizeof(ntHeaders), NULL);
+
+        HANDLE moduleSnap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, processInfo.pid);
+        if (moduleSnap != INVALID_HANDLE_VALUE) {
+            MODULEENTRY32W moduleEntry;
+            moduleEntry.dwSize = sizeof(moduleEntry);
+
+            if (Module32FirstW(moduleSnap, &moduleEntry)) {
+                do {
+                    if (_wcsicmp(moduleEntry.szModule, L"discord_voice.node") == 0) {
+                        std::wstring loadedPath = moduleEntry.szExePath;
+                        std::wstring expectedPath = voiceNodePath;
+
+                        if (loadedPath.find(L"\\\\?\\") == 0) {
+                            loadedPath = loadedPath.substr(4);
+                        }
+                        if (expectedPath.find(L"\\\\?\\") == 0) {
+                            expectedPath = expectedPath.substr(4);
+                        }
+
+                        std::transform(loadedPath.begin(), loadedPath.end(), loadedPath.begin(), ::tolower);
+                        std::transform(expectedPath.begin(), expectedPath.end(), expectedPath.begin(), ::tolower);
+
+                        if (loadedPath != expectedPath) {
+                            std::cout << RED << "[!] Voice node loaded from incorrect path!\n";
+                            std::cout << "Expected: " << ws2s(expectedPath) << "\n";
+                            std::cout << "Found: " << ws2s(loadedPath) << RESET << "\n";
+
+                            std::ofstream log("logs.txt", std::ios::app);
+                            log << "\n[MEMORY PATCH DETECTED]\n";
+                            log << "Type: Incorrect voice node path\n";
+                            log << "Expected Path: " << ws2s(expectedPath) << "\n";
+                            log << "Loaded Path: " << ws2s(loadedPath) << "\n";
+                            log << "Timestamp: " << getCurrentTimestamp() << "\n";
+                            log.close();
+
+                            result.foundHooks = true;
+                        }
+                        break;
+                    }
+                } while (Module32NextW(moduleSnap, &moduleEntry));
+            }
+            CloseHandle(moduleSnap);
+        }
+
+        for (int i = 0; i < ntHeaders.FileHeader.NumberOfSections; i++) {
+            IMAGE_SECTION_HEADER sectionHeader;
+            ReadProcessMemory(processHandle,
+                (LPCVOID)(processInfo.baseAddress + dosHeader.e_lfanew + sizeof(IMAGE_NT_HEADERS) + (i * sizeof(IMAGE_SECTION_HEADER))),
+                &sectionHeader, sizeof(sectionHeader), NULL);
+
+            if (sectionHeader.Characteristics & IMAGE_SCN_MEM_EXECUTE) {
+                std::vector<uint8_t> memoryData(sectionHeader.Misc.VirtualSize);
+                ReadProcessMemory(processHandle,
+                    (LPCVOID)(processInfo.baseAddress + sectionHeader.VirtualAddress),
+                    memoryData.data(), sectionHeader.Misc.VirtualSize, NULL);
+
+                for (size_t offset = 0; offset < memoryData.size() - 10; offset++) {
+                    bool foundHook = false;
+                    for (const auto& pattern : HOOK_PATTERNS) {
+                        if (offset + pattern.pattern.size() <= memoryData.size()) {
+                            if (std::equal(pattern.pattern.begin(), pattern.pattern.end(), memoryData.begin() + offset)) {
+                                size_t fileOffset = sectionHeader.PointerToRawData + offset;
+                                if (fileOffset + pattern.pattern.size() <= fileData.size() &&
+                                    !std::equal(pattern.pattern.begin(), pattern.pattern.end(),
+                                        fileData.begin() + fileOffset)) {
+                                    result.foundHooks = true;
+                                    result.sectionName = std::string((char*)sectionHeader.Name, 8);
+                                    result.offset = sectionHeader.VirtualAddress + offset;
+                                    result.hookType = pattern.name;
+
+                                    result.originalBytes.assign(
+                                        fileData.begin() + fileOffset,
+                                        fileData.begin() + fileOffset + pattern.pattern.size()
+                                    );
+                                    result.modifiedBytes.assign(
+                                        memoryData.begin() + offset,
+                                        memoryData.begin() + offset + pattern.pattern.size()
+                                    );
+
+                                    writeHookDetails("logs.txt", result, true);
+
+                                    if (!hookDetectedPrinted) {
+                                        HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+                                        SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_INTENSITY);
+                                        for (const auto& line : boxChars) {
+                                            std::wcout << line << std::endl;
+                                        }
+                                        hookDetectedPrinted = true;
+                                    }
+                                    foundHook = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if (!foundHook) {
+                        size_t fileOffset = sectionHeader.PointerToRawData + offset;
+                        if (fileOffset + 10 <= fileData.size()) {
+                            if (!std::equal(fileData.begin() + fileOffset, fileData.begin() + fileOffset + 10, memoryData.begin() + offset)) {
+                                result.sectionName = std::string((char*)sectionHeader.Name, 8);
+                                result.offset = sectionHeader.VirtualAddress + offset;
+                                result.hookType = "Memory Patch";
+
+                                result.originalBytes.assign(fileData.begin() + fileOffset, fileData.begin() + fileOffset + 10);
+                                result.modifiedBytes.assign(memoryData.begin() + offset, memoryData.begin() + offset + 10);
+
+                                writeHookDetails("logs.txt", result, false);
+                            }
                         }
                     }
                 }
             }
         }
+
+        CloseHandle(processHandle);
+    }
+    catch (const std::exception& e) {
+        std::cout << RED << "[!] Error during analysis: " << e.what() << "\n" << RESET;
+        result.foundHooks = true;
+    }
+    catch (...) {
+        std::cout << RED << "[!] Unknown error during analysis\n" << RESET;
+        result.foundHooks = true;
     }
 
-    CloseHandle(processHandle);
     return result;
 }
 
